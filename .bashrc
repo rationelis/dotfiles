@@ -15,3 +15,5 @@ xsetroot -solid "#000000"
 # Set language keyboard layouts
 setxkbmap us,ru 
 
+# Add GHCup to PATH
+export PATH="$HOME/.ghcup/bin:$PATH"
