@@ -17,3 +17,9 @@ setxkbmap us,ru
 
 # Add GHCup to PATH
 export PATH="$HOME/.ghcup/bin:$PATH"
+
+# Add NVM to PATH
+source /usr/share/nvm/init-nvm.sh
+
+# Add dotfiles alias
+alias dotfiles='/usr/bin/git --git-dir="$HOME/.dotfiles/" --work-tree="$HOME"'
