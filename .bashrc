@@ -23,3 +23,8 @@ source /usr/share/nvm/init-nvm.sh
 
 # Add dotfiles alias
 alias dotfiles='/usr/bin/git --git-dir="$HOME/.dotfiles/" --work-tree="$HOME"'
+
+# SSH Agent (silence)
+if [ -z "$SSH_AUTH_SOCK" ] ; then
+  eval `ssh-agent -s` > /dev/null
+fi
