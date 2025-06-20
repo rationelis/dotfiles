@@ -8,13 +8,7 @@ while pgrep -u $UID -x polybar >/dev/null; do sleep 1; done
 if type "xrandr"; then
   for m in $(xrandr --query | grep " connected" | cut -d" " -f1); do
     echo "Launching polybar on monitor: $m"
-    if [[ $m == "DP-4" ]]; then
-      # Primary monitor gets full bar
-      MONITOR=$m polybar --reload main &
-    else
-      # Secondary monitor gets simplified bar
-      MONITOR=$m polybar --reload secondary &
-    fi
+    MONITOR=$m polybar --reload main &
   done
 else
   polybar --reload main &

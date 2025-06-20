@@ -1,14 +1,15 @@
 return {
 	{
-		"ahmedkhalf/project.nvim",
+		"DrKJeff16/project.nvim",
 		config = function()
 			require("project_nvim").setup({
-                patterns = {
-                    ".git",
-                    "Cargo.toml",
-                    "package.json",
-                }
-            })
+				patterns = {
+					".git",
+					"Cargo.toml",
+					"package.json",
+					"README.md",
+				},
+			})
 		end,
 	},
 

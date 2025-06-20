@@ -1,0 +1,15 @@
+[user]
+	email = corneevanblerk@gmail.com
+	name = Rationelis
+
+[pull]
+	rebase = true
+
+[push]
+	autoSetupRemote = true
+
+[init]
+	defaultBranch = main
+
+[diff]
+	external = difft

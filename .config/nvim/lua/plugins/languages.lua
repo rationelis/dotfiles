@@ -17,7 +17,6 @@ return {
 				"ts_ls",
 				"pyright",
 				"ruff",
-				"hls",
 				"clangd",
 			},
 			automatic_installation = true,
