@@ -113,6 +113,6 @@ bindsym Print exec flameshot gui
 bindsym $mod+Shift+f exec firefox
 
 exec_always --no-startup-id "setxkbmap us,ru -option grp:alt_shift_toggle"
-bindsym $mod+space exec "xkb-switch -n && polybar-msg hook keyboard-flag 1"
+bindsym $mod+space exec --no-startup-id "env PATH=$PATH xkb-switch -n && polybar-msg hook keyboard-flag 1"
 
 exec_always --no-startup-id $HOME/.config/polybar/launch.sh
