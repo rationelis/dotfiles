@@ -9,6 +9,7 @@ return {
 					"package.json",
 					"README.md",
 				},
+				detection_methods = { "pattern" },
 			})
 		end,
 	},
@@ -68,7 +69,7 @@ return {
 
 			vim.keymap.set("n", "<leader>pf", function()
 				require("telescope.builtin").find_files({
-					cwd = require("project_nvim.project").get_project_root(),
+					cwd = require("project_nvim").get_project_root(),
 				})
 			end, { desc = "Find Files in Project Root" })
 
