@@ -2,7 +2,6 @@ return {
 	{
 		"neovim/nvim-lspconfig",
 		config = function()
-			local lspconfig = require("lspconfig")
 			local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
 			local on_attach = function(_, bufnr)
@@ -14,10 +13,12 @@ return {
 				map("n", "gr", vim.lsp.buf.references, "Go to references")
 				map("n", "K", vim.lsp.buf.hover, "Hover documentation")
 			end
+
 			vim.lsp.inlay_hint.enable()
 			vim.diagnostic.config({ virtual_text = true })
 
-			lspconfig.pyright.setup({
+			-- Migrate from require("lspconfig").pyright.setup
+			vim.lsp.config("pyright", {
 				on_attach = on_attach,
 				capabilities = capabilities,
 				settings = {
