@@ -1,8 +1,8 @@
 return {
 	{
-		"DrKJeff16/project.nvim",
+		"ahmedkhalf/project.nvim",
 		config = function()
-			require("project").setup({
+			require("project_nvim").setup({
 				patterns = {
 					".git",
 					"Cargo.toml",
@@ -64,13 +64,13 @@ return {
 			local telescope = require("telescope")
 			telescope.setup({})
 
+			require("telescope").load_extension("projects")
+
 			local builtin = require("telescope.builtin")
 			local utils = require("telescope.utils")
 
 			vim.keymap.set("n", "<leader>pf", function()
-				require("telescope.builtin").find_files({
-					cwd = require("project").get_project_root(),
-				})
+				require("telescope").extensions.projects.projects({})
 			end, { desc = "Find Files in Project Root" })
 
 			vim.keymap.set("n", "<leader>ps", function()
@@ -80,6 +80,20 @@ return {
 					end,
 				})
 			end, { noremap = true, silent = true, desc = "Live Grep (1 per file)" })
+
+			vim.keymap.set("n", "<leader>pd", function()
+				builtin.diagnostics({
+					bufnr = 0,
+					layout_strategy = "vertical",
+					layout_config = {
+						height = 0.8,
+						width = 0.8,
+						preview_cutoff = 0,
+						prompt_position = "top",
+					},
+					sorting_strategy = "ascending",
+				})
+			end, { noremap = true, silent = true, desc = "Telescope Diagnostics" })
 		end,
 	},
 
