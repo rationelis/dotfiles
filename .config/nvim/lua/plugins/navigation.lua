@@ -70,6 +70,13 @@ return {
 			local utils = require("telescope.utils")
 
 			vim.keymap.set("n", "<leader>pf", function()
+				local cwd = vim.fn.getcwd()
+				builtin.find_files({
+					cwd = cwd,
+				})
+			end, { noremap = true, silent = true, desc = "Find Files in CWD" })
+
+			vim.keymap.set("n", "<leader>pp", function()
 				require("telescope").extensions.projects.projects({})
 			end, { desc = "Find Files in Project Root" })
 
