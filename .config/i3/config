@@ -106,10 +106,9 @@ bindsym $mod+r mode "resize"
 ### Custom
 
 bindsym $mod+Shift+p exec --no-startup-id ~/.config/polybar/launch.sh
+bindsym $mod+Shift+d exec --no-startup-id ~/.config/i3/setup_displays.sh
 
-# exec --no-startup-id xrandr --output DP-4 -r 144 --primary --mode 2560x1440 --pos 0x0 --rotate normal --output DVI-D-0 --mode 1920x1080 --pos 2560x0 --rotate normal
-# workspace 1 output DP-4
-# workspace 2 output DVI-D-0
+exec --no-startup-id ~/.config/i3/setup_displays.sh
 
 exec --no-startup-id xsetroot -solid "#000000"
 

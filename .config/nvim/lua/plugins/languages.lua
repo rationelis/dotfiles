@@ -49,7 +49,13 @@ return {
 		opts = {
 			settings = {
 				tsserver_file_preferences = {
-					includeInlayParameterNameHints = "all",
+					includeInlayParameterNameHints = "literals",
+					includeInlayParameterNameHintsWhenArgumentMatchesName = false,
+					includeInlayFunctionParameterTypeHints = false,
+					includeInlayVariableTypeHints = false,
+					includeInlayPropertyDeclarationTypeHints = false,
+					includeInlayFunctionLikeReturnTypeHints = false,
+					includeInlayEnumMemberValueHints = false,
 					includeCompletionsForModuleExports = true,
 					quotePreference = "auto",
 				},

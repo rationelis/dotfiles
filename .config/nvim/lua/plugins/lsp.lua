@@ -14,7 +14,22 @@ return {
 				map("n", "K", vim.lsp.buf.hover, "Hover documentation")
 			end
 
-			vim.lsp.inlay_hint.enable()
+			-- Enable inlay hints with error handling for P5.js and other JS files
+			local function safe_enable_inlay_hints()
+				local ok, _ = pcall(vim.lsp.inlay_hint.enable)
+				if not ok then
+					vim.notify("Failed to enable inlay hints", vim.log.levels.WARN)
+				end
+			end
+
+			-- Only enable inlay hints for certain filetypes to avoid issues with P5.js
+			vim.api.nvim_create_autocmd("FileType", {
+				pattern = { "lua", "rust", "python", "typescript", "vue" },
+				callback = function()
+					safe_enable_inlay_hints()
+				end,
+			})
+
 			vim.diagnostic.config({ virtual_text = true })
 
 			-- Migrate from require("lspconfig").pyright.setup
