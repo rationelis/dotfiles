@@ -18,7 +18,7 @@ if check_output "DP-4" && check_output "DVI-D-0"; then
 
     # Assign workspaces to specific outputs
     i3-msg "workspace 1 output DP-4"
-    i3-msg "workspace 2 output DVI-D-0"
+    i3-msg "workspace 2 output DVI-D-1"
 
 elif check_output "DP-4"; then
     echo "Single DP-4 monitor detected"
