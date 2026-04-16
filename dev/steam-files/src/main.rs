@@ -92,7 +92,9 @@ fn parse_acf(path: &Path, compatdata: &Path) -> Option<App> {
     Some(App {
         id: id?,
         name: name?,
-        path: compatdata.join(id?.to_string()),
+        path: compatdata
+            .join(id?.to_string())
+            .join("pfx/drive_c/users/steamuser"),
     })
 }
 
