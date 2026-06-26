@@ -49,7 +49,7 @@ opt.isfname:append("@-@")
 local map = vim.keymap.set
 
 -- File explorer
-map("n", "<leader>pv", vim.cmd.Ex, { desc = "Open file explorer" })
+map("n", "<leader>pv", "<cmd>Ex<CR>", { desc = "Open file explorer" })
 
 -- Diagnostics
 map("n", "<leader>di", vim.diagnostic.open_float, { desc = "Open diagnostics float" })
@@ -94,7 +94,7 @@ require("lazy").setup({
 		"rebelot/kanagawa.nvim",
 		priority = 1000,
 		config = function()
-			vim.cmd.colorscheme("kanagawa")
+			vim.cmd("colorscheme kanagawa")
 		end,
 	},
 
@@ -107,14 +107,14 @@ require("lazy").setup({
 	{
 		"tpope/vim-fugitive",
 		config = function()
-			map("n", "<leader>gs", vim.cmd.Git, { desc = "Git status" })
+			map("n", "<leader>gs", "<cmd>Git<CR>", { desc = "Git status" })
 		end,
 	},
 
 	{
 		"mbbill/undotree",
 		config = function()
-			map("n", "<leader><F5>", vim.cmd.UndotreeToggle, { desc = "Toggle Undotree" })
+			map("n", "<leader><F5>", "<cmd>UndotreeToggle<CR>", { desc = "Toggle Undotree" })
 		end,
 	},
 
@@ -620,7 +620,6 @@ require("lazy").setup({
 				"gzip",
 				"matchit",
 				"matchparen",
-				"netrwPlugin",
 				"tarPlugin",
 				"tohtml",
 				"tutor",
