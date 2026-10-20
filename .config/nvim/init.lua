@@ -1,67 +1,134 @@
--- ╔════════════════════════════════════════════════════════════════╗
--- ║                    NEOVIM CONFIGURATION                         ║
--- ║          Single-file, future-proof, maintainable config        ║
--- ╚════════════════════════════════════════════════════════════════╝
+-- Neovim >= 0.12 only.
+--
+-- Ownership map (one owner per responsibility):
+--   Rust LSP + Cargo/Clippy ........ rustaceanvim (the ONLY thing that starts rust-analyzer)
+--   Every other language server .... vim.lsp.config / vim.lsp.enable (definitions come from nvim-lspconfig)
+--   Installing external tools ...... mason.nvim (rust toolchain tools come from rustup, not Mason)
+--   Completion / signature help .... Neovim's built-in LSP completion
+--   Syntax highlighting ............ Neovim's built-in tree-sitter (nvim-treesitter only supplies parsers + queries)
+--   Formatting ..................... conform.nvim (formatters), never LSP formatting
+--   Linting ........................ language servers (rust-analyzer/clippy, ruff, eslint, pyright)
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 1. LEADER KEY
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if vim.fn.has("nvim-0.12") == 0 then
+	vim.notify("This config requires Neovim >= 0.12", vim.log.levels.ERROR)
+	return
+end
+
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 2. VIM OPTIONS
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local map = vim.keymap.set
+local augroup = vim.api.nvim_create_augroup("user", { clear = true })
+
+-- ── Data: what gets installed ──────────────────────────────────────
+
+-- Tree-sitter parsers installed by nvim-treesitter. Parsers that Neovim ships
+-- itself (c, lua, vim, vimdoc, query, markdown) are deliberately not listed.
+local parsers = {
+	"rust",
+	"toml",
+	"javascript",
+	"typescript",
+	"tsx",
+	"python",
+	"json",
+	"yaml",
+	"bash",
+	"html",
+	"css",
+}
+
+-- Mason package names (not lspconfig names). rust-analyzer, rustfmt and clippy
+-- come from rustup: Mason's rust-analyzer would not match your toolchain.
+local mason_tools = {
+	"lua-language-server",
+	"stylua",
+	"typescript-language-server",
+	"eslint-lsp",
+	"prettier",
+	"pyright",
+	"ruff",
+}
+
+-- lspconfig server names enabled through vim.lsp.enable().
+-- Never add "rust_analyzer" here: rustaceanvim owns rust-analyzer.
+local lsp_servers = { "lua_ls", "ts_ls", "eslint", "pyright", "ruff" }
+
+-- ── Options ────────────────────────────────────────────────────────
+
 local opt = vim.opt
 
--- UI
 opt.guicursor = ""
-opt.nu = true
+opt.number = true
 opt.relativenumber = true
 opt.signcolumn = "yes"
 opt.colorcolumn = "80"
 opt.scrolloff = 8
+opt.winborder = "single"
 
--- Indentation
 opt.tabstop = 4
 opt.softtabstop = 4
 opt.shiftwidth = 4
 opt.expandtab = true
-opt.smartindent = true
 
--- Search
 opt.hlsearch = false
-opt.incsearch = true
 
--- Files & Undo
 opt.swapfile = false
-opt.backup = false
-opt.undodir = vim.fn.stdpath("data") .. "/undo"
 opt.undofile = true
+opt.undodir = vim.fn.stdpath("data") .. "/undo" -- Nvim creates it on first write
 
--- Performance
-opt.updatetime = 50
+opt.updatetime = 250
 opt.isfname:append("@-@")
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 3. CORE KEYMAPS
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local map = vim.keymap.set
+-- Completion: the popup opens as you type and is refreshed on <BS>.
+-- "o" = omnifunc, which Neovim sets to the LSP client on attach; "." = current
+-- buffer words (limited to 5). Select with <C-n>/<C-p> (or Up/Down while the
+-- popup is open), accept with <C-y>.
+opt.autocomplete = true
+opt.complete = "o,.^5"
+opt.completeopt = { "menu", "menuone", "noselect", "popup" }
 
--- File explorer
-map("n", "<leader>pv", "<cmd>Ex<CR>", { desc = "Open file explorer" })
+-- ── Keymaps (LSP keymaps gra/grn/grr/gri/grt/gO/K/<C-s> are built in) ──
 
--- Diagnostics
-map("n", "<leader>di", vim.diagnostic.open_float, { desc = "Open diagnostics float" })
+map("n", "<leader>pv", "<cmd>Ex<CR>", { desc = "File explorer" })
+map("n", "<leader>di", vim.diagnostic.open_float, { desc = "Diagnostics float" })
+map("n", "<leader>u", function()
+	vim.cmd.packadd("nvim.undotree") -- bundled with Neovim 0.12, replaces the undotree plugin
+	vim.cmd.Undotree()
+end, { desc = "Undo tree" })
 
--- Hard mode: disable arrow keys
+-- Hard mode: arrow keys are disabled, except Up/Down move through the completion popup.
 for _, key in ipairs({ "<Up>", "<Down>", "<Left>", "<Right>" }) do
-	map({ "n", "i", "v" }, key, "<NOP>", { noremap = true })
+	map({ "n", "v" }, key, "<Nop>")
+	map("i", key, "<Nop>")
 end
+-- <CR>: accept the selected completion item, otherwise close the popup and insert a newline.
+map("i", "<CR>", function()
+	if vim.fn.pumvisible() == 0 then
+		return "<CR>"
+	end
+	return vim.fn.complete_info({ "selected" }).selected >= 0 and "<C-y>" or "<C-e><CR>"
+end, { expr = true })
+map("i", "<Down>", function()
+	return vim.fn.pumvisible() == 1 and "<C-n>" or ""
+end, { expr = true })
+map("i", "<Up>", function()
+	return vim.fn.pumvisible() == 1 and "<C-p>" or ""
+end, { expr = true })
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 4. LAZY.NVIM BOOTSTRAP
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- Indent: 2 spaces for the web stack.
+vim.api.nvim_create_autocmd("FileType", {
+	group = augroup,
+	pattern = { "javascript", "javascriptreact", "typescript", "typescriptreact", "json", "yaml", "html", "css" },
+	callback = function()
+		vim.bo.shiftwidth = 2
+		vim.bo.tabstop = 2
+		vim.bo.softtabstop = 2
+	end,
+})
+
+-- ── lazy.nvim bootstrap ────────────────────────────────────────────
+
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.uv.fs_stat(lazypath) then
 	local out = vim.system({
@@ -72,235 +139,246 @@ if not vim.uv.fs_stat(lazypath) then
 		"https://github.com/folke/lazy.nvim.git",
 		lazypath,
 	}):wait()
-
 	if out.code ~= 0 then
-		vim.api.nvim_echo({
-			{ "Failed to clone lazy.nvim\n", "ErrorMsg" },
-			{ out.stderr or "", "WarningMsg" },
-		}, true, {})
+		vim.api.nvim_echo({ { "Failed to clone lazy.nvim:\n" .. (out.stderr or ""), "ErrorMsg" } }, true, {})
 		return
 	end
 end
 opt.rtp:prepend(lazypath)
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 5. PLUGINS
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- ── Plugins ────────────────────────────────────────────────────────
+
 require("lazy").setup({
-	-- ────────────────────────────────────────────────────────────
-	-- COLORSCHEME
-	-- ────────────────────────────────────────────────────────────
 	{
-		"rebelot/kanagawa.nvim",
+		"EdenEast/nightfox.nvim",
 		priority = 1000,
 		config = function()
-			vim.cmd("colorscheme kanagawa")
+			vim.cmd.colorscheme("nightfox")
 		end,
 	},
 
-	-- ────────────────────────────────────────────────────────────
-	-- ESSENTIAL UTILITIES
-	-- ────────────────────────────────────────────────────────────
-	{ "nvim-lua/plenary.nvim" },
-	{ "github/copilot.vim" },
-
-	{
-		"tpope/vim-fugitive",
-		config = function()
-			map("n", "<leader>gs", "<cmd>Git<CR>", { desc = "Git status" })
-		end,
-	},
-
-	{
-		"mbbill/undotree",
-		config = function()
-			map("n", "<leader><F5>", "<cmd>UndotreeToggle<CR>", { desc = "Toggle Undotree" })
-		end,
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- TREESITTER
-	-- ────────────────────────────────────────────────────────────
+	-- Tree-sitter: provides parsers and queries only. Highlighting is started
+	-- by the FileType autocmd below (the plugin does not do it for you).
+	-- The plugin does not support lazy-loading.
 	{
 		"nvim-treesitter/nvim-treesitter",
+		branch = "main",
+		lazy = false,
 		build = ":TSUpdate",
 		config = function()
-			require("nvim-treesitter.configs").setup({
-				ensure_installed = {
-					"lua",
-					"rust",
-					"typescript",
-					"python",
-					"haskell",
-					"c",
-					"html",
-					"css",
-					"markdown",
-					"markdown_inline",
-					"bash",
-					"regex",
-					"json",
-					"yaml",
-					"toml",
-				},
-				highlight = {
-					enable = true,
-					additional_vim_regex_highlighting = false,
-				},
-			})
+			local ts = require("nvim-treesitter")
+			local installed = ts.get_installed("parsers")
+			local missing = vim.tbl_filter(function(lang)
+				return not vim.list_contains(installed, lang)
+			end, parsers)
+			if #missing > 0 then
+				ts.install(missing) -- async; only runs when something is actually missing
+			end
 		end,
 	},
 
-	-- ────────────────────────────────────────────────────────────
-	-- LSP BASE
-	-- ────────────────────────────────────────────────────────────
-	{
-		"neovim/nvim-lspconfig",
-		dependencies = { "hrsh7th/cmp-nvim-lsp" },
-		config = function()
-			-- LSP keybinds on attach
-			vim.api.nvim_create_autocmd("LspAttach", {
-				callback = function(args)
-					local bufnr = args.buf
-					local opts = { buffer = bufnr }
+	-- Provides the lsp/<server>.lua definitions used by vim.lsp.enable().
+	-- It is not set up and never starts anything on its own.
+	{ "neovim/nvim-lspconfig" },
 
-					map("n", "gd", vim.lsp.buf.definition, vim.tbl_extend("force", opts, { desc = "Go to definition" }))
-					map(
-						"n",
-						"gi",
-						vim.lsp.buf.implementation,
-						vim.tbl_extend("force", opts, { desc = "Go to implementation" })
-					)
-					map("n", "gr", vim.lsp.buf.references, vim.tbl_extend("force", opts, { desc = "Go to references" }))
-					map("n", "K", vim.lsp.buf.hover, vim.tbl_extend("force", opts, { desc = "Hover documentation" }))
+	-- Installs tools only; no mason-lspconfig / mason-tool-installer needed.
+	{
+		"mason-org/mason.nvim",
+		lazy = false, -- must run at startup so Mason's bin dir is on $PATH before the first LSP starts
+		opts = {},
+		config = function(_, opts)
+			require("mason").setup(opts)
+			vim.api.nvim_create_autocmd("VimEnter", {
+				group = augroup,
+				once = true,
+				callback = function()
+					-- is_installed() is a plain directory check: no network, no registry load.
+					local registry = require("mason-registry")
+					local missing = vim.tbl_filter(function(name)
+						return not registry.is_installed(name)
+					end, mason_tools)
+					if #missing > 0 then
+						vim.cmd("MasonInstall " .. table.concat(missing, " "))
+					end
 				end,
 			})
-
-			-- Diagnostic config
-			vim.diagnostic.config({ virtual_text = true })
-
-			-- Get capabilities from cmp
-			local capabilities = require("cmp_nvim_lsp").default_capabilities()
-
-			-- Python: Pyright with Ruff
-			vim.lsp.config("pyright", {
-				capabilities = capabilities,
-				settings = {
-					pyright = {
-						disableOrganizeImports = true,
-					},
-					python = {
-						analysis = {
-							ignore = { "*" },
-						},
-					},
-				},
-			})
 		end,
 	},
 
-	{
-		"nvimdev/lspsaga.nvim",
-		branch = "main",
-		opts = {
-			preview = {
-				lines_above = 2,
-				lines_below = 10,
-			},
-			symbol_in_winbar = {
-				enable = false,
-			},
-			ui = {
-				border = "single",
-				code_action = "🦝",
-			},
-			lightbulb = {
-				sign = false,
-			},
-		},
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- MASON: LSP/TOOL INSTALLER
-	-- ────────────────────────────────────────────────────────────
-	{
-		"williamboman/mason.nvim",
-		build = ":MasonUpdate",
-		config = function()
-			require("mason").setup()
-		end,
-	},
-
-	{
-		"williamboman/mason-lspconfig.nvim",
-		dependencies = { "williamboman/mason.nvim" },
-		opts = {
-			ensure_installed = {
-				"lua_ls",
-				"pyright",
-				"ruff",
-				"clangd",
-			},
-			automatic_installation = true,
-		},
-	},
-
-	{
-		"WhoIsSethDaniel/mason-tool-installer.nvim",
-		dependencies = { "williamboman/mason.nvim" },
-		opts = {
-			ensure_installed = {
-				"prettier",
-				"stylua",
-				"black",
-				"eslint_d",
-			},
-			auto_update = true,
-			run_on_start = true,
-		},
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- LANGUAGE-SPECIFIC
-	-- ────────────────────────────────────────────────────────────
+	-- Rust: starts and owns rust-analyzer. Needs no setup() or lspconfig.
+	-- Clippy-on-save is enabled automatically when `cargo clippy` exists.
 	{
 		"mrcjkb/rustaceanvim",
-		version = "^6",
-		lazy = false,
-		ft = "rust",
+		version = "^9",
+		lazy = false, -- already lazy by design (filetype plugin)
 	},
 
-	{
-		"pmizio/typescript-tools.nvim",
-		dependencies = { "nvim-lua/plenary.nvim", "neovim/nvim-lspconfig" },
-		opts = {
-			settings = {
-				tsserver_file_preferences = {
-					includeInlayParameterNameHints = "literals",
-					includeInlayParameterNameHintsWhenArgumentMatchesName = false,
-					includeInlayFunctionParameterTypeHints = false,
-					includeInlayVariableTypeHints = false,
-					includeInlayPropertyDeclarationTypeHints = false,
-					includeInlayFunctionLikeReturnTypeHints = false,
-					includeInlayEnumMemberValueHints = false,
-					includeCompletionsForModuleExports = true,
-					quotePreference = "auto",
-				},
-				tsserver_format_options = {
-					allowIncompleteCompletions = false,
-					allowRenameOfImportPath = false,
-				},
-			},
-		},
-	},
-
+	-- Cargo.toml: dependency versions/features/upgrade actions through an in-process LSP.
 	{
 		"Saecki/crates.nvim",
 		event = "BufRead Cargo.toml",
-		opts = {},
-		dependencies = { "nvimtools/none-ls.nvim" },
+		opts = {
+			lsp = { enabled = true, actions = true, completion = true, hover = true },
+		},
 	},
 
+	-- Formatting: conform is the only thing that formats. Each filetype lists
+	-- its formatters explicitly and LSP formatting is never used, so tools
+	-- cannot compete with each other.
+	{
+		"stevearc/conform.nvim",
+		opts = {
+			formatters_by_ft = {
+				rust = { "rustfmt" },
+				lua = { "stylua" },
+				python = { "ruff_organize_imports", "ruff_format" },
+				javascript = { "prettier" },
+				javascriptreact = { "prettier" },
+				typescript = { "prettier" },
+				typescriptreact = { "prettier" },
+				json = { "prettier" },
+				jsonc = { "prettier" },
+				yaml = { "prettier" },
+				markdown = { "prettier" },
+				html = { "prettier" },
+				css = { "prettier" },
+				scss = { "prettier" },
+			},
+			format_on_save = function(bufnr)
+				if vim.g.autoformat == false or vim.b[bufnr].autoformat == false then
+					return
+				end
+				return { timeout_ms = 2000, lsp_format = "never" }
+			end,
+		},
+		config = function(_, opts)
+			require("conform").setup(opts)
+			map({ "n", "v" }, "<leader>cf", function()
+				require("conform").format({ async = true, lsp_format = "never" })
+			end, { desc = "Format buffer" })
+			vim.api.nvim_create_user_command("AutoformatToggle", function()
+				vim.g.autoformat = vim.g.autoformat == false
+				vim.notify("Autoformat on save: " .. tostring(vim.g.autoformat ~= false))
+			end, { desc = "Toggle format on save" })
+		end,
+	},
+
+	-- Navigation / search
+	{
+		"nvim-telescope/telescope.nvim",
+		version = "*",
+		dependencies = { "nvim-lua/plenary.nvim", "nvim-tree/nvim-web-devicons" },
+		cmd = "Telescope",
+		keys = {
+			{
+				"<leader>pf",
+				function()
+					require("telescope.builtin").find_files()
+				end,
+				desc = "Find files",
+			},
+			{
+				"<leader>ps",
+				function()
+					require("telescope.builtin").live_grep()
+				end,
+				desc = "Live grep",
+			},
+			{
+				"<leader>pb",
+				function()
+					require("telescope.builtin").buffers()
+				end,
+				desc = "Buffers",
+			},
+			{
+				"<leader>po",
+				function()
+					require("telescope.builtin").lsp_document_symbols()
+				end,
+				desc = "Document symbols",
+			},
+			{
+				"<leader>pd",
+				function()
+					require("telescope.builtin").diagnostics({
+						bufnr = 0,
+						layout_strategy = "vertical",
+						layout_config = { height = 0.8, width = 0.8, preview_cutoff = 0, prompt_position = "top" },
+						sorting_strategy = "ascending",
+					})
+				end,
+				desc = "Buffer diagnostics",
+			},
+		},
+		opts = {},
+	},
+
+	{
+		"ThePrimeagen/harpoon",
+		branch = "harpoon2",
+		dependencies = { "nvim-lua/plenary.nvim" },
+		config = function()
+			local harpoon = require("harpoon")
+			harpoon:setup()
+			map("n", "<leader>a", function()
+				harpoon:list():add()
+			end, { desc = "Harpoon: add file" })
+			map("n", "<C-e>", function()
+				harpoon.ui:toggle_quick_menu(harpoon:list())
+			end, { desc = "Harpoon: menu" })
+			map("n", "<C-h>", function()
+				harpoon:list():prev()
+			end, { desc = "Harpoon: previous" })
+			map("n", "<C-l>", function()
+				harpoon:list():next()
+			end, { desc = "Harpoon: next" })
+		end,
+	},
+
+	-- Git
+	{ "tpope/vim-fugitive", cmd = { "Git", "G" }, keys = { { "<leader>gs", "<cmd>Git<CR>", desc = "Git status" } } },
+
+	{
+		"lewis6991/gitsigns.nvim",
+		event = { "BufReadPre", "BufNewFile" },
+		opts = {
+			signs = {
+				add = { text = "+" },
+				change = { text = "~" },
+				delete = { text = "_" },
+				topdelete = { text = "‾" },
+				changedelete = { text = "~" },
+			},
+			on_attach = function(bufnr)
+				local gs = require("gitsigns")
+				local function bmap(lhs, rhs, desc)
+					map("n", lhs, rhs, { buffer = bufnr, desc = desc })
+				end
+				bmap("]h", function()
+					gs.nav_hunk("next")
+				end, "Next hunk")
+				bmap("[h", function()
+					gs.nav_hunk("prev")
+				end, "Previous hunk")
+				bmap("<leader>hp", gs.preview_hunk, "Preview hunk")
+				bmap("<leader>hs", gs.stage_hunk, "Stage hunk")
+				bmap("<leader>hr", gs.reset_hunk, "Reset hunk")
+				bmap("<leader>hb", gs.blame_line, "Blame line")
+			end,
+		},
+	},
+
+	{
+		"nvim-lualine/lualine.nvim",
+		dependencies = { "nvim-tree/nvim-web-devicons" },
+		opts = {
+			options = { component_separators = "", section_separators = "" },
+			sections = { lualine_x = { "filetype" } },
+		},
+	},
+
+	-- Optional extras, loaded only on demand.
 	{
 		"hat0uma/csvview.nvim",
 		cmd = { "CsvViewEnable", "CsvViewDisable", "CsvViewToggle" },
@@ -317,397 +395,99 @@ require("lazy").setup({
 		},
 	},
 
-	-- ────────────────────────────────────────────────────────────
-	-- COMPLETION
-	-- ────────────────────────────────────────────────────────────
-	{
-		"hrsh7th/nvim-cmp",
-		dependencies = {
-			"hrsh7th/cmp-nvim-lsp",
-			"hrsh7th/cmp-nvim-lsp-signature-help",
-			"hrsh7th/cmp-buffer",
-			"hrsh7th/cmp-path",
-		},
-		config = function()
-			local cmp = require("cmp")
-
-			local cmp_kinds = {
-				Text = "  ",
-				Method = "  ",
-				Function = "  ",
-				Constructor = "  ",
-				Field = "  ",
-				Variable = "  ",
-				Class = "  ",
-				Interface = "  ",
-				Module = "  ",
-				Property = "  ",
-				Unit = "  ",
-				Value = "  ",
-				Enum = "  ",
-				Keyword = "  ",
-				Snippet = "  ",
-				Color = "  ",
-				File = "  ",
-				Reference = "  ",
-				Folder = "  ",
-				EnumMember = "  ",
-				Constant = "  ",
-				Struct = "  ",
-				Event = "  ",
-				Operator = "  ",
-				TypeParameter = "  ",
-			}
-
-			cmp.setup({
-				sources = {
-					{ name = "nvim_lsp" },
-					{ name = "nvim_lsp_signature_help" },
-					{ name = "buffer" },
-					{ name = "path" },
-				},
-				preselect = cmp.PreselectMode.None,
-				mapping = cmp.mapping.preset.insert({
-					["<C-u>"] = cmp.mapping.scroll_docs(-4),
-					["<C-d>"] = cmp.mapping.scroll_docs(4),
-					["<C-n>"] = cmp.mapping.select_next_item(),
-					["<C-p>"] = cmp.mapping.select_prev_item(),
-					["<C-Space>"] = cmp.mapping.complete(),
-					["<C-e>"] = cmp.mapping.abort(),
-					["<CR>"] = cmp.mapping.confirm({ select = false }),
-				}),
-				formatting = {
-					format = function(_, vim_item)
-						vim_item.kind = (cmp_kinds[vim_item.kind] or "") .. vim_item.kind
-						vim_item.abbr = string.sub(vim_item.abbr, 1, 15)
-						return vim_item
-					end,
-				},
-			})
-		end,
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- FORMATTING
-	-- ────────────────────────────────────────────────────────────
-	{
-		"stevearc/conform.nvim",
-		config = function()
-			require("conform").setup({
-				formatters_by_ft = {
-					lua = { "stylua" },
-					rust = { "rustfmt" },
-					markdown = { "prettier" },
-					typescript = { "prettier", "eslint_d" },
-					json = { "prettier" },
-					yaml = { "prettier" },
-					vue = { "prettier" },
-					javascript = { "prettier" },
-					css = { "prettier" },
-					scss = { "prettier" },
-					python = { "black" },
-					c = { "clang-format" },
-				},
-			})
-
-			-- Format on save
-			vim.api.nvim_create_autocmd("BufWritePre", {
-				pattern = "*",
-				callback = function(args)
-					require("conform").format({ bufnr = args.buf })
-				end,
-			})
-		end,
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- NAVIGATION & SEARCH
-	-- ────────────────────────────────────────────────────────────
-	{
-		"nvim-telescope/telescope.nvim",
-		tag = "0.1.8",
-		dependencies = { "nvim-lua/plenary.nvim" },
-		config = function()
-			local telescope = require("telescope")
-			telescope.setup({})
-			telescope.load_extension("projects")
-
-			local builtin = require("telescope.builtin")
-
-			map("n", "<leader>pf", function()
-				builtin.find_files({ cwd = vim.fn.getcwd() })
-			end, { desc = "Find files in CWD" })
-
-			map("n", "<leader>pp", function()
-				telescope.extensions.projects.projects({})
-			end, { desc = "Find projects" })
-
-			map("n", "<leader>ps", function()
-				builtin.live_grep()
-			end, { desc = "Live grep" })
-
-			map("n", "<leader>pd", function()
-				builtin.diagnostics({
-					bufnr = 0,
-					layout_strategy = "vertical",
-					layout_config = {
-						height = 0.8,
-						width = 0.8,
-						preview_cutoff = 0,
-						prompt_position = "top",
-					},
-					sorting_strategy = "ascending",
-				})
-			end, { desc = "Buffer diagnostics" })
-		end,
-	},
-
-	{
-		"ahmedkhalf/project.nvim",
-		config = function()
-			require("project_nvim").setup({
-				patterns = { ".git", "Cargo.toml", "package.json", "README.md" },
-				detection_methods = { "pattern" },
-			})
-		end,
-	},
-
-	{
-		"ThePrimeagen/harpoon",
-		branch = "harpoon2",
-		dependencies = { "nvim-lua/plenary.nvim" },
-		config = function()
-			local harpoon = require("harpoon")
-			harpoon:setup()
-
-			map("n", "<leader>a", function()
-				harpoon:list():add()
-			end, { desc = "Harpoon: Add file" })
-
-			map("n", "<C-e>", function()
-				harpoon.ui:toggle_quick_menu(harpoon:list())
-			end, { desc = "Harpoon: Toggle menu" })
-
-			map("n", "<C-h>", function()
-				harpoon:list():prev()
-			end, { desc = "Harpoon: Prev buffer" })
-
-			map("n", "<C-l>", function()
-				harpoon:list():next()
-			end, { desc = "Harpoon: Next buffer" })
-		end,
-	},
-
-	{
-		"hedyhli/outline.nvim",
-		config = function()
-			require("outline").setup({
-				symbol_folding = { autofold_depth = 2 },
-			})
-			map("n", "<leader>o", "<cmd>Outline<CR>", { desc = "Toggle Outline" })
-		end,
-	},
-
-	{
-		"nvim-pack/nvim-spectre",
-		config = function()
-			map("n", "<leader>S", function()
-				require("spectre").toggle()
-			end, { desc = "Toggle Spectre" })
-
-			map("n", "<leader>sw", function()
-				require("spectre").open_visual({ select_word = true })
-			end, { desc = "Search current word" })
-
-			map("v", "<leader>sw", function()
-				vim.cmd("esc")
-				require("spectre").open_visual()
-			end, { desc = "Search selection" })
-
-			map("n", "<leader>sp", function()
-				require("spectre").open_file_search({ select_word = true })
-			end, { desc = "Search in current file" })
-		end,
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- UI & APPEARANCE
-	-- ────────────────────────────────────────────────────────────
-	{
-		"lewis6991/gitsigns.nvim",
-		event = { "BufReadPre", "BufNewFile" },
-		opts = {
-			signs = {
-				add = { text = "+" },
-				change = { text = "~" },
-				delete = { text = "_" },
-				topdelete = { text = "‾" },
-				changedelete = { text = "~" },
-			},
-			signcolumn = true,
-			numhl = false,
-			linehl = false,
-			word_diff = false,
-			watch_gitdir = {
-				interval = 1000,
-				follow_files = true,
-			},
-			attach_to_untracked = true,
-			current_line_blame = false,
-			sign_priority = 6,
-			update_debounce = 100,
-			max_file_length = 40000,
-			preview_config = {
-				border = "single",
-				style = "minimal",
-				relative = "cursor",
-				row = 0,
-				col = 1,
-			},
-		},
-	},
-
-	{
-		"nvim-lualine/lualine.nvim",
-		dependencies = { "nvim-tree/nvim-web-devicons" },
-		opts = {
-			options = {
-				icons_enabled = true,
-				theme = "auto",
-				component_separators = { left = "", right = "" },
-				section_separators = { left = "", right = "" },
-				globalstatus = false,
-			},
-			sections = {
-				lualine_a = { "mode" },
-				lualine_b = { "branch", "diff", "diagnostics" },
-				lualine_c = { "filename" },
-				lualine_x = { "filetype" },
-				lualine_y = { "progress" },
-				lualine_z = { "location" },
-			},
-			inactive_sections = {
-				lualine_a = {},
-				lualine_b = {},
-				lualine_c = { "filename" },
-				lualine_x = { "location" },
-				lualine_y = {},
-				lualine_z = {},
-			},
-		},
-	},
-
-	-- ────────────────────────────────────────────────────────────
-	-- DATABASE
-	-- ────────────────────────────────────────────────────────────
 	{
 		"kristijanhusak/vim-dadbod-ui",
-		dependencies = {
-			{ "tpope/vim-dadbod", lazy = true },
-			{ "kristijanhusak/vim-dadbod-completion", ft = { "sql", "mysql", "plsql" }, lazy = true },
-		},
+		dependencies = { { "tpope/vim-dadbod", lazy = true } },
 		cmd = { "DBUI", "DBUIToggle", "DBUIAddConnection", "DBUIFindBuffer" },
 		init = function()
 			vim.g.db_ui_use_nerd_fonts = 1
 		end,
 	},
 }, {
-	-- Lazy.nvim options
-	checker = { enabled = true },
+	checker = { enabled = false }, -- no background git fetches; use :Lazy update when you want to
+	change_detection = { notify = false },
+	rocks = { enabled = false },
+	install = { colorscheme = { "nightfox" } },
 	performance = {
-		rtp = {
-			disabled_plugins = {
-				"gzip",
-				"matchit",
-				"matchparen",
-				"tarPlugin",
-				"tohtml",
-				"tutor",
-				"zipPlugin",
-			},
+		rtp = { disabled_plugins = { "gzip", "matchit", "matchparen", "tarPlugin", "tohtml", "tutor", "zipPlugin" } },
+	},
+})
+
+-- ── Tree-sitter highlighting ───────────────────────────────────────
+
+vim.api.nvim_create_autocmd("FileType", {
+	group = augroup,
+	callback = function(args)
+		local lang = vim.treesitter.language.get_lang(args.match)
+		-- language.add() returns nil (no error) when the parser is not installed.
+		if lang and vim.list_contains(parsers, lang) and vim.treesitter.language.add(lang) then
+			vim.treesitter.start(args.buf, lang)
+		end
+	end,
+})
+
+-- ── LSP ────────────────────────────────────────────────────────────
+
+-- Capabilities: Neovim's defaults already advertise snippets, resolveSupport,
+-- etc. for its built-in completion, and rustaceanvim extends the same defaults,
+-- so no per-server capability plumbing is needed.
+
+vim.lsp.config("lua_ls", {
+	settings = {
+		Lua = {
+			runtime = { version = "LuaJIT" },
+			workspace = { checkThirdParty = false, library = { vim.env.VIMRUNTIME } },
 		},
 	},
 })
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 6. FILETYPE-SPECIFIC CONFIGURATION
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
--- Rust configuration
-vim.api.nvim_create_autocmd("FileType", {
-	pattern = "rust",
-	callback = function()
-		vim.g.rustaceanvim = {
-			server = {
-				default_settings = {
-					["rust-analyzer"] = {
-						rustc = { source = "discover" },
-						cargo = { allFeatures = true },
-					},
-				},
-			},
-		}
+-- Pyright does type checking; Ruff does linting, import sorting and formatting.
+vim.lsp.config("pyright", {
+	settings = { pyright = { disableOrganizeImports = true } }, -- Ruff owns import sorting
+})
+vim.lsp.config("ruff", {
+	on_attach = function(client)
+		client.server_capabilities.hoverProvider = false -- Pyright owns hover (documented by Ruff)
 	end,
 })
 
--- JavaScript configuration (P5.js compatibility)
-vim.api.nvim_create_autocmd("FileType", {
-	pattern = "javascript",
-	callback = function()
-		-- Disable inlay hints for JavaScript to prevent column range errors
-		pcall(vim.lsp.inlay_hint.enable, false, { bufnr = 0 })
+vim.lsp.enable(lsp_servers)
+vim.lsp.inlay_hint.enable(true)
 
-		-- Set indentation
-		vim.bo.shiftwidth = 2
-		vim.bo.tabstop = 2
-		vim.bo.softtabstop = 2
-		vim.bo.expandtab = true
-		vim.bo.commentstring = "// %s"
-	end,
+vim.diagnostic.config({
+	virtual_text = true,
+	severity_sort = true,
+	float = { source = true },
 })
 
--- Vue configuration
-vim.api.nvim_create_autocmd("FileType", {
-	pattern = "vue",
-	callback = function()
-		vim.lsp.config("vtsls", {
-			settings = {
-				vtsls = {
-					tsserver = {
-						globalPlugins = {
-							{
-								name = "@vue/typescript-plugin",
-								location = vim.fn.expand(
-									"~/.local/share/pnpm/global/5/node_modules/@vue/language-server"
-								),
-								languages = { "vue" },
-								configNamespace = "typescript",
-							},
-						},
-					},
-				},
-			},
-			filetypes = { "typescript", "javascript", "vue" },
-		})
+vim.api.nvim_create_autocmd("LspAttach", {
+	group = augroup,
+	callback = function(args)
+		local client = assert(vim.lsp.get_client_by_id(args.data.client_id))
+		local buf = args.buf
 
-		vim.lsp.enable({ "vue_ls", "vtsls" })
+		if client:supports_method("textDocument/completion") then
+			vim.lsp.completion.enable(true, client.id, buf, { autotrigger = true })
+		end
+
+		map("n", "gd", vim.lsp.buf.definition, { buffer = buf, desc = "Go to definition" })
+		map("i", "<C-Space>", vim.lsp.completion.get, { buffer = buf, desc = "Trigger completion" })
+
+		if client.name == "rust-analyzer" then
+			local function rmap(lhs, cmd, desc)
+				map("n", lhs, function()
+					vim.cmd.RustLsp(cmd)
+				end, { buffer = buf, desc = desc })
+			end
+			rmap("gra", "codeAction", "Code action (grouped)")
+			rmap("K", { "hover", "actions" }, "Hover actions")
+			rmap("<leader>rr", "runnables", "Rust: runnables")
+			rmap("<leader>rt", "testables", "Rust: testables")
+			rmap("<leader>re", "explainError", "Rust: explain error")
+			rmap("<leader>rd", "renderDiagnostic", "Rust: rendered diagnostic")
+			rmap("<leader>rm", "expandMacro", "Rust: expand macro")
+			rmap("<leader>rc", "openCargo", "Rust: open Cargo.toml")
+			rmap("<leader>rp", "parentModule", "Rust: parent module")
+		end
 	end,
 })
-
--- Enable inlay hints for specific filetypes
-vim.api.nvim_create_autocmd("FileType", {
-	pattern = { "lua", "rust", "python", "typescript", "vue" },
-	callback = function()
-		pcall(vim.lsp.inlay_hint.enable)
-	end,
-})
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- 7. FINAL TOUCHES
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
--- Create undo directory if it doesn't exist
-local undo_dir = vim.fn.stdpath("data") .. "/undo"
-if vim.fn.isdirectory(undo_dir) == 0 then
-	vim.fn.mkdir(undo_dir, "p")
-end
